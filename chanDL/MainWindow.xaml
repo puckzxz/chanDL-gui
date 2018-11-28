@@ -29,7 +29,7 @@
     HorizontalAlignment="Left" VerticalAlignment="Center">
                 <ComboBoxItem
       IsSelected="True">
-                    4chan
+                    4chan/4channel
                 </ComboBoxItem>
             </ComboBox>
         </StackPanel>
