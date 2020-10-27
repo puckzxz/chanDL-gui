@@ -1,101 +1,130 @@
-﻿using HtmlAgilityPack;
-using Microsoft.WindowsAPICodePack.Dialogs;
-using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Text.Json;
+using System.Net.Http;
+using System.IO;
+using System.Net;
+using System.Windows.Controls;
 
 namespace chanDL
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
+        private static readonly string BASE_API_URL = "https://a.4cdn.org";
+        private static readonly string BASE_IMAGE_URL = "https://i.4cdn.org";
+        private readonly static HttpClient client = new HttpClient();
+        private static string board = "";
+        private static string threadID = "";
+        private static string thread = "";
+
         public MainWindow()
         {
             InitializeComponent();
             if (Properties.Settings.Default.DownloadPath != string.Empty)
             {
-                tbDownloadPath.Text = Properties.Settings.Default.DownloadPath;
+                lblDownloadPath.Content = Properties.Settings.Default.DownloadPath;
             }
             else
             {
-                tbDownloadPath.Text = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                lblDownloadPath.Content = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                Properties.Settings.Default.DownloadPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                Properties.Settings.Default.Save();
             }
         }
 
-        private async void btnStartDownload_Click(object sender, RoutedEventArgs e)
+        private void btnDownload_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(tbThreadURL.Text) & Uri.IsWellFormedUriString(tbThreadURL.Text, UriKind.Absolute))
+            if (board == string.Empty | thread == string.Empty)
             {
-                var thread = tbThreadURL.Text;
-                var path = tbDownloadPath.Text;
-                var skipExisting = cbSkipExistingImages.IsChecked.Value;
-                lblImage.Dispatcher.Invoke(() => lblImage.Content = string.Empty);
-                pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Value = 0);
-                await Task.Run(() => DownloadThread(thread, path, skipExisting));
+                return;
             }
-            else
-            {
-                MessageBox.Show("You must enter a valid thread URL!", "Error!", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Value = 0);
+            Task.Run(() => DownloadThread());
         }
 
-        private void DownloadThread(string threadURL, string downloadPath, bool skipExistingImages)
+        private async void DownloadThread()
         {
-            var imageNodes = new HtmlWeb().Load(threadURL).DocumentNode.SelectNodes("//a[contains(@class, 'fileThumb')]");
-            string threadID = threadURL.Split(new[] { "thread/" }, StringSplitOptions.None)[1];
-            string board = threadURL.Split(new[] { "g/" }, StringSplitOptions.None)[1].Split('/')[0];
-            string folderName = $"{board} - {threadID}";
-            string downloadFolder = Path.Combine(downloadPath, folderName);
+            var downloadFolder = Path.Combine(Properties.Settings.Default.DownloadPath, $"{board}-{threadID}");
+
             if (!Directory.Exists(downloadFolder))
             {
                 Directory.CreateDirectory(downloadFolder);
             }
 
-            List<Uri> ImageURLs = imageNodes.Select(image => new Uri("https:" + image.Attributes["href"].Value)).ToList();
+            var resp = await client.GetAsync($"{BASE_API_URL}/{board}/thread/{threadID}.json");
 
-            if (skipExistingImages)
+            if (!resp.IsSuccessStatusCode)
             {
-                // Get the file name of each file in the download folder
-                List<string> filesInDownloadFolder = Directory.GetFiles(downloadFolder).Select(Path.GetFileName).ToList();
-
-                // Compare the links we have to the files we have downloaded to find out what images we need
-                ImageURLs = ImageURLs.Where(x => !filesInDownloadFolder.Contains(Path.GetFileName(x.AbsolutePath))).ToList();
+                MessageBox.Show(
+                    $"Failed to fetch data from 4chan thread\nStatus: {resp.StatusCode}\nError: {resp.ReasonPhrase}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
             }
 
-            pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Maximum = ImageURLs.Count);
+            var thread = JsonSerializer.Deserialize<Thread>(await resp.Content.ReadAsStringAsync());
 
-            // Download our images
-            Parallel.ForEach(ImageURLs, image =>
+            var posts = thread.Posts.Where(p => p.Filename != 0);
+
+            var skipExisting = cbSkipExistingImages.Dispatcher.Invoke(() => cbSkipExistingImages.IsChecked.Value);
+
+            if (skipExisting)
             {
-                using (WebClient wc = new WebClient())
-                {
-                    lblImage.Dispatcher.Invoke(() => lblImage.Content = $"Downloading {Path.GetFileName(image.LocalPath)}");
-                    wc.DownloadFile(image.AbsoluteUri, Path.Combine(downloadFolder, Path.GetFileName(image.LocalPath)));
-                    pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Value++);
-                }
+                var existingFiles = Directory.GetFiles(downloadFolder).Select(Path.GetFileName).ToList();
+                posts = posts.Where(p => !existingFiles.Contains(Path.GetFileName($"{p.Filename}{p.Extenstion}"))).ToList();
+            }
+
+            pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Maximum = posts.Count());
+
+            var downloadedImages = 0;
+
+            lblDownloadAmount.Dispatcher.Invoke(() => lblDownloadAmount.Content = $"Downloading {downloadedImages} of {posts.Count()}");
+
+            Parallel.ForEach(posts, post =>
+            {
+                using var wc = new WebClient();
+                wc.DownloadFile($"{BASE_IMAGE_URL}/{board}/{post.Filename}{post.Extenstion}", Path.Combine(downloadFolder, $"{post.Filename}{post.Extenstion}"));
+                downloadedImages++;
+                pbDownloadProgress.Dispatcher.Invoke(() => pbDownloadProgress.Value++);
+                lblDownloadAmount.Dispatcher.Invoke(() => lblDownloadAmount.Content = $"Downloading {downloadedImages} of {posts.Count()}");
             });
-            lblImage.Dispatcher.Invoke(() => lblImage.Content = $"Downloaded {ImageURLs.Count} images");
+
+            lblDownloadAmount.Dispatcher.Invoke(() => lblDownloadAmount.Content = $"Downloaded {posts.Count()} images");
         }
 
-        private void btnSetDownloadFolder_Click(object sender, RoutedEventArgs e)
+        private void btnSetDownloadPath_Click(object sender, RoutedEventArgs e)
         {
-            CommonOpenFileDialog dialog = new CommonOpenFileDialog
+            var dialog = new System.Windows.Forms.FolderBrowserDialog
             {
-                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                IsFolderPicker = true
+                SelectedPath = Properties.Settings.Default.DownloadPath
             };
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            var res = dialog.ShowDialog();
+            if (res == System.Windows.Forms.DialogResult.OK)
             {
-                tbDownloadPath.Text = dialog.FileName;
-                Properties.Settings.Default.DownloadPath = dialog.FileName;
+                lblDownloadPath.Content = dialog.SelectedPath;
+                Properties.Settings.Default.DownloadPath = dialog.SelectedPath;
                 Properties.Settings.Default.Save();
             }
+        }
+
+        private void tbThreadURL_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            thread = tbThreadURL.Text;
+            if (thread.Split(".org/").Length < 2 | thread.Split("thread/").Length < 2)
+            {
+                lblDownloadPath.Content = $"{Properties.Settings.Default.DownloadPath}";
+                return;
+            }
+            board = thread.Split(".org/")[1].Split("/")[0];
+            threadID = thread.Split("thread/")[1];
+            if (threadID.EndsWith("/"))
+            {
+                threadID = threadID.Split("/")[0];
+            }
+            lblDownloadPath.Content = $"{Properties.Settings.Default.DownloadPath}\\{board}-{threadID}";
         }
     }
 }

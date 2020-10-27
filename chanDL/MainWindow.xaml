@@ -5,41 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:chanDL"
         mc:Ignorable="d"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        TextElement.FontWeight="Regular"
-        TextElement.FontSize="13"
-        TextOptions.TextFormattingMode="Ideal"
-        TextOptions.TextRenderingMode="Auto"
-        Background="{DynamicResource MaterialDesignPaper}"
-        FontFamily="{DynamicResource MaterialDesignFont}"
-        Title="chanDL" Height="400" Width="600" MinWidth="600" MinHeight="400" ResizeMode="CanMinimize">
+        Title="chanDL" Height="175" WindowStyle="SingleBorderWindow" ResizeMode="NoResize" VerticalAlignment="Bottom" HorizontalAlignment="Center" Width="500">
     <Grid>
-        <TextBox x:Name="tbThreadURL"
-  materialDesign:HintAssist.Hint="Thread URL"
-  Style="{StaticResource MaterialDesignFloatingHintTextBox}" VerticalAlignment="Top" Margin="20,100,20,0" />
-        <Button x:Name="btnStartDownload" Content="Download" HorizontalAlignment="Right" Margin="0,0,20,50" VerticalAlignment="Bottom" Click="btnStartDownload_Click" />
-        <TextBox x:Name="tbDownloadPath"
-  materialDesign:HintAssist.Hint="Download Folder"
-  Style="{StaticResource MaterialDesignFloatingHintTextBox}" VerticalAlignment="Top" Margin="20,170,20,0" />
-        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="20,0,0,0">
-            <ComboBox x:Name="cmboxSiteSelector"
-    materialDesign:ComboBoxAssist.ShowSelectedItem="{Binding ElementName=DisplaySelectedItemCheckBox, Path=IsChecked}"
-    Margin="0,10,0,20"
-    HorizontalAlignment="Left" VerticalAlignment="Center">
-                <ComboBoxItem
-      IsSelected="True">
-                    4chan/4channel
-                </ComboBoxItem>
-            </ComboBox>
-        </StackPanel>
-        <Button x:Name="btnSetDownloadFolder"
-    Style="{StaticResource MaterialDesignFlatButton}" Height="Auto" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="20,200,0,110" Content="Set Download Folder" Click="btnSetDownloadFolder_Click" />
-        <Label x:Name="lblImage" HorizontalAlignment="Left" Margin="20,0,0,25" VerticalAlignment="Bottom" />
-        <ProgressBar x:Name="pbDownloadProgress" Height="10" Margin="20,0,20,10" VerticalAlignment="Bottom" IsIndeterminate="False" />
-        <CheckBox x:Name="cbSkipExistingImages"
-    Style="{StaticResource MaterialDesignCheckBox}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,30">
-            Skip existing images?
-        </CheckBox>
+        <TextBox x:Name="tbThreadURL" HorizontalAlignment="Stretch" TextWrapping="NoWrap" VerticalAlignment="Top" Margin="5,5,5,0" TextChanged="tbThreadURL_TextChanged"/>
+        <Button x:Name="btnDownload" Height="20" Width="80" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,5,15" Content="Download" Click="btnDownload_Click"/>
+        <GroupBox Header="Download Path:" Margin="0,35,0,0" BorderBrush="{x:Null}" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <Label x:Name="lblDownloadPath" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Top"/>
+        </GroupBox>
+        <Button x:Name="btnSetDownloadPath" Content="Set Download Path" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,100,15" Click="btnSetDownloadPath_Click"/>
+        <ProgressBar x:Name="pbDownloadProgress" HorizontalAlignment="Stretch" Height="10" VerticalAlignment="Bottom"/>
+        <Label x:Name="lblDownloadAmount" HorizontalAlignment="Left" Margin="5,0,0,10" VerticalAlignment="Bottom"/>
+        <CheckBox x:Name="cbSkipExistingImages" Content="Skip Existing Images" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,40,40"/>
     </Grid>
 </Window>
